@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LLMClient, Config, HeaderUtils } from "coze-coding-dev-sdk";
+import { createAIProvider } from '@/lib/ai';
 
 export async function POST(request: NextRequest) {
   try {
-    const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
-    const config = new Config();
-    const client = new LLMClient(config, customHeaders);
+    const provider = createAIProvider('qiniuyun');
 
     const { scenario, partnerName, partnerPersonality, currentRound, playerRole } = await request.json();
 
@@ -125,7 +123,7 @@ ${partnerLabel}性格：${partnerPersonality}
       { role: "user" as const, content: `生成第${currentRound}轮的回复选项` }
     ];
 
-    const response = await client.invoke(messages, { temperature: 0.9 });
+    const response = await provider.chat(messages, { temperature: 0.9 });
 
     // 解析 JSON 响应
     let optionsData;

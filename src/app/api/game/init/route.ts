@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LLMClient, TTSClient, Config, HeaderUtils } from "coze-coding-dev-sdk";
+import { TTSClient, Config, HeaderUtils } from "coze-coding-dev-sdk";
+import { createAIProvider } from '@/lib/ai';
 
 // 女声音色映射
 const VOICE_ROLE_MAP_FEMALE: Record<number, string> = {
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
   try {
     const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
     const config = new Config();
-    const client = new LLMClient(config, customHeaders);
+    const llmProvider = createAIProvider('qiniuyun');
 
     const { role, topicId, voiceRoleId } = await request.json();
 
@@ -129,7 +130,7 @@ ${playerName}（玩家）的伴侣名字：${partnerName}
       { role: "user" as const, content: topicTitle ? `生成一个关于"${topicTitle}"的吵架场景` : "生成一个随机的情侣吵架场景" }
     ];
 
-    const response = await client.invoke(messages, { temperature: 0.9 });
+    const response = await llmProvider.chat(messages, { temperature: 0.9 });
 
     // 解析 JSON 响应
     let gameData;
@@ -253,7 +254,7 @@ ${partnerName}性格：${gameData.partnerPersonality}
       // 生成选项
       (async () => {
         try {
-          const optionsResponse = await client.invoke([
+          const optionsResponse = await llmProvider.chat([
             { role: "system" as const, content: optionsPrompt },
             { role: "user" as const, content: "生成第1轮的回复选项" }
           ], { temperature: 0.9 });
