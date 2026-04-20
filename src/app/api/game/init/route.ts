@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { TTSClient, Config, HeaderUtils } from "coze-coding-dev-sdk";
-import { createAIProvider } from '@/lib/ai';
+import { createAIProvider, createTTSProvider } from '@/lib/ai';
 
-// 女声音色映射
-const VOICE_ROLE_MAP_FEMALE: Record<number, string> = {
-  1: "saturn_zh_female_keainvsheng_tob",
-  2: "zh_female_santongyongns_saturn_bigtts",
-  3: "zh_female_mizai_saturn_bigtts",
-  4: "zh_female_xvxiaoxiannv_saturn_bigtts",
-  5: "zh_female_meilinvyou_saturn_bigtts",
-  6: "zh_female_jitangnv_saturn_bigtts",
-  7: "zh_female_xiaohe_uranus_bigtts",
-  8: "zh_female_vv_uranus_bigtts",
-};
-
-// 男声音色映射
-const VOICE_ROLE_MAP_MALE: Record<number, string> = {
-  101: "zh_male_m191_uranus_bigtts",
-  102: "zh_male_taocheng_uranus_bigtts",
-  103: "zh_male_dayi_saturn_bigtts",
-  104: "zh_male_ruyayichen_saturn_bigtts",
+// 音色映射 (SiliconFlow MOSS-TTS)
+// 女声：alex, anna, bella, claire, diana
+// 男声：benjamin, charles, david
+const VOICE_ROLE_MAP: Record<number, string> = {
+  1: "fnlp/MOSS-TTSD-v0.5:alex",      // 甜萌萝莉
+  2: "fnlp/MOSS-TTSD-v0.5:anna",     // 温柔淑女
+  3: "fnlp/MOSS-TTSD-v0.5:claire",   // 知性御姐
+  4: "fnlp/MOSS-TTSD-v0.5:bella",    // 活泼少女
+  5: "fnlp/MOSS-TTSD-v0.5:diana",    // 傲娇小公举
+  6: "fnlp/MOSS-TTSD-v0.5:alex",     // 霸道御姐
+  7: "fnlp/MOSS-TTSD-v0.5:anna",     // 邻家女孩
+  8: "fnlp/MOSS-TTSD-v0.5:diana",    // 高冷女神
+  101: "fnlp/MOSS-TTSD-v0.5:benjamin", // 阳光男孩
+  102: "fnlp/MOSS-TTSD-v0.5:charles",   // 磁性低音
+  103: "fnlp/MOSS-TTSD-v0.5:david",     // 温柔暖男
+  104: "fnlp/MOSS-TTSD-v0.5:benjamin", // 儒雅绅士
 };
 
 // 预设话题映射
@@ -42,9 +39,8 @@ const GIRL_NAMES = ["小雨", "小芳", "小丽", "小美", "阿玲"];
 
 export async function POST(request: NextRequest) {
   try {
-    const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
-    const config = new Config();
     const llmProvider = createAIProvider('qiniuyun');
+    const ttsProvider = createTTSProvider('siliconflow');
 
     const { role, topicId, voiceRoleId } = await request.json();
 
@@ -158,13 +154,7 @@ ${playerName}（玩家）的伴侣名字：${partnerName}
     // ===== 同时生成 TTS 和第一轮选项 =====
     
     // 确定音色
-    const isReplyFromGirl = isPlayerBoy;
-    let speaker: string;
-    if (isReplyFromGirl) {
-      speaker = VOICE_ROLE_MAP_FEMALE[voiceRoleId] || VOICE_ROLE_MAP_FEMALE[7];
-    } else {
-      speaker = VOICE_ROLE_MAP_MALE[voiceRoleId] || VOICE_ROLE_MAP_MALE[101];
-    }
+    const speaker = VOICE_ROLE_MAP[voiceRoleId] || VOICE_ROLE_MAP[1];
     
     const playerLabel = isPlayerBoy ? "男朋友" : "女朋友";
     const partnerLabel = isPlayerBoy ? "女朋友" : "男朋友";
@@ -237,18 +227,14 @@ ${partnerName}性格：${gameData.partnerPersonality}
       // 生成 TTS
       (async () => {
         try {
-          const ttsClient = new TTSClient(config, customHeaders);
-          const ttsResponse = await ttsClient.synthesize({
-            uid: `init-${Date.now()}`,
+          const ttsResponse = await ttsProvider.synthesize({
             text: gameData.scenario,
-            speaker: speaker,
-            audioFormat: "mp3",
-            sampleRate: 24000
+            voice: speaker,
           });
-          return { success: true, audioUri: ttsResponse.audioUri };
+          return { success: true, audioData: ttsResponse.audioData.toString('base64') };
         } catch (ttsError) {
           console.error("Init TTS error:", ttsError);
-          return { success: false, audioUri: null };
+          return { success: false, audioData: null };
         }
       })(),
       // 生成选项
@@ -289,7 +275,7 @@ ${partnerName}性格：${gameData.partnerPersonality}
       data: {
         ...gameData,
         voiceRoleId: voiceRoleId || 1,
-        initialAudioUri: ttsResult.success ? ttsResult.audioUri : null,
+        initialAudioData: ttsResult.success ? ttsResult.audioData : null,
         initialOptions: optionsResult.options
       }
     });

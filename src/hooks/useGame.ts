@@ -2,6 +2,18 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 
+// 将 base64 音频数据转换为 audio URL
+function createAudioUrlFromBase64(base64Data: string): string {
+  const byteCharacters = atob(base64Data);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  const blob = new Blob([byteArray], { type: "audio/mp3" });
+  return URL.createObjectURL(blob);
+}
+
 // 预设吵架话题列表
 export const PRESET_TOPICS = [
   { id: 1, title: "忘记纪念日/生日", emoji: "🎂", description: "重要的纪念日或生日忘记了" },
@@ -221,7 +233,7 @@ export function useGame(onGameEnd?: (result: { success: boolean; score: number; 
           speaker: "girl" as const,
           text: data.scenario,
           emotion: data.initialEmotion,
-          audioUrl: data.initialAudioUri || undefined,
+          audioUrl: data.initialAudioData ? createAudioUrlFromBase64(data.initialAudioData) : undefined,
         };
         
         // 直接使用 init API 返回的选项，不需要单独请求
@@ -254,8 +266,8 @@ export function useGame(onGameEnd?: (result: { success: boolean; score: number; 
         }));
         
         // 设置初始语音并播放
-        if (data.initialAudioUri) {
-          setAudioUrl(data.initialAudioUri);
+        if (data.initialAudioData) {
+          setAudioUrl(createAudioUrlFromBase64(data.initialAudioData));
         }
       }
     } catch (error) {
@@ -330,8 +342,8 @@ export function useGame(onGameEnd?: (result: { success: boolean; score: number; 
             }),
           });
           const ttsResult = await ttsResponse.json();
-          if (ttsResult.success) {
-            newAudioUrl = ttsResult.audioUri;
+          if (ttsResult.success && ttsResult.audioData) {
+            newAudioUrl = createAudioUrlFromBase64(ttsResult.audioData);
           }
         } catch (ttsError) {
           console.error("TTS error:", ttsError);

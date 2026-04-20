@@ -1,68 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { TTSClient, Config, HeaderUtils } from "coze-coding-dev-sdk";
+import { createTTSProvider } from '@/lib/ai';
 
-// 女声音色映射
-const VOICE_ROLE_MAP_FEMALE: Record<number, string> = {
-  1: "saturn_zh_female_keainvsheng_tob",  // 甜萌萝莉
-  2: "zh_female_santongyongns_saturn_bigtts",  // 温柔淑女
-  3: "zh_female_mizai_saturn_bigtts",  // 知性御姐
-  4: "zh_female_xvxiaoxiannv_saturn_bigtts",  // 活泼少女
-  5: "zh_female_meilinvyou_saturn_bigtts",  // 傲娇小公举
-  6: "zh_female_jitangnv_saturn_bigtts",  // 霸道御姐
-  7: "zh_female_xiaohe_uranus_bigtts",  // 邻家女孩
-  8: "zh_female_vv_uranus_bigtts",  // 高冷女神
-};
-
-// 男声音色映射
-const VOICE_ROLE_MAP_MALE: Record<number, string> = {
-  101: "zh_male_m191_uranus_bigtts",  // 阳光男孩
-  102: "zh_male_taocheng_uranus_bigtts",  // 磁性低音
-  103: "zh_male_dayi_saturn_bigtts",  // 温柔暖男
-  104: "zh_male_ruyayichen_saturn_bigtts",  // 儒雅绅士
-};
-
-// 合并音色映射
+// 音色映射 (SiliconFlow MOSS-TTS)
+// 女声：alex, anna, bella, claire, diana
+// 男声：benjamin, charles, david
 const VOICE_ROLE_MAP: Record<number, string> = {
-  ...VOICE_ROLE_MAP_FEMALE,
-  ...VOICE_ROLE_MAP_MALE,
+  1: "fnlp/MOSS-TTSD-v0.5:alex",      // 甜萌萝莉
+  2: "fnlp/MOSS-TTSD-v0.5:anna",     // 温柔淑女
+  3: "fnlp/MOSS-TTSD-v0.5:claire",   // 知性御姐
+  4: "fnlp/MOSS-TTSD-v0.5:bella",    // 活泼少女
+  5: "fnlp/MOSS-TTSD-v0.5:diana",    // 傲娇小公举
+  6: "fnlp/MOSS-TTSD-v0.5:alex",     // 霸道御姐
+  7: "fnlp/MOSS-TTSD-v0.5:anna",     // 邻家女孩
+  8: "fnlp/MOSS-TTSD-v0.5:diana",    // 高冷女神
+  101: "fnlp/MOSS-TTSD-v0.5:benjamin", // 阳光男孩
+  102: "fnlp/MOSS-TTSD-v0.5:charles",   // 磁性低音
+  103: "fnlp/MOSS-TTSD-v0.5:david",     // 温柔暖男
+  104: "fnlp/MOSS-TTSD-v0.5:benjamin", // 儒雅绅士
 };
 
 export async function POST(request: NextRequest) {
   try {
-    const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
-    const config = new Config();
-    const client = new TTSClient(config, customHeaders);
+    const ttsProvider = createTTSProvider('siliconflow');
 
     const { text, voiceRoleId, playerRole } = await request.json();
 
-    // 确定回复者的性别
-    // 当 playerRole 是 "boyfriend" 时，回复者是女朋友（女声）
-    // 当 playerRole 是 "girlfriend" 时，回复者是男朋友（男声）
-    const isPlayerBoy = playerRole === "boyfriend";
-    const isReplyFromGirl = isPlayerBoy; // 玩家是男友时，回复来自女友（女声）
-    
-    // 根据回复者性别确定音色
-    let speaker: string;
-    
-    if (isReplyFromGirl) {
-      // 回复来自女朋友，用女声
-      speaker = VOICE_ROLE_MAP_FEMALE[voiceRoleId] || VOICE_ROLE_MAP_FEMALE[7]; // 默认邻家女孩
-    } else {
-      // 回复来自男朋友，用男声
-      speaker = VOICE_ROLE_MAP_MALE[voiceRoleId] || VOICE_ROLE_MAP_MALE[101]; // 默认阳光男孩
-    }
+    const voice = VOICE_ROLE_MAP[voiceRoleId] || "fnlp/MOSS-TTSD-v0.5:alex";
 
-    const response = await client.synthesize({
-      uid: `game-${Date.now()}`,
+    const response = await ttsProvider.synthesize({
       text: text,
-      speaker: speaker,
-      audioFormat: "mp3",
-      sampleRate: 24000
+      voice: voice,
     });
+
+    // 将音频数据转换为 base64
+    const audioBase64 = response.audioData.toString('base64');
 
     return NextResponse.json({
       success: true,
-      audioUri: response.audioUri,
+      audioData: audioBase64,
       audioSize: response.audioSize
     });
   } catch (error) {
