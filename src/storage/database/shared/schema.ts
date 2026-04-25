@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, timestamp, index } from "drizzle-orm/pg-core"
+import { pgTable, serial, varchar, text, timestamp, index, pgPolicy } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const users = pgTable(

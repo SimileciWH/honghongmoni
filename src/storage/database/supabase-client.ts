@@ -9,21 +9,26 @@ interface SupabaseCredentials {
 }
 
 function loadEnv(): void {
-  if (envLoaded || (process.env.COZE_SUPABASE_URL && process.env.COZE_SUPABASE_ANON_KEY)) {
+  if (envLoaded) {
+    return;
+  }
+
+  if (process.env.COZE_SUPABASE_URL && process.env.COZE_SUPABASE_ANON_KEY) {
+    envLoaded = true;
     return;
   }
 
   try {
-    try {
-      require('dotenv').config();
-      if (process.env.COZE_SUPABASE_URL && process.env.COZE_SUPABASE_ANON_KEY) {
-        envLoaded = true;
-        return;
-      }
-    } catch {
-      // dotenv not available
+    require('dotenv').config();
+    if (process.env.COZE_SUPABASE_URL && process.env.COZE_SUPABASE_ANON_KEY) {
+      envLoaded = true;
+      return;
     }
+  } catch {
+    // dotenv not available
+  }
 
+  try {
     const pythonCode = `
 import os
 import sys
@@ -40,7 +45,7 @@ except Exception as e:
 
     const output = execSync(`python3 -c '${pythonCode.replace(/'/g, "'\"'\"'")}'`, {
       encoding: 'utf-8',
-      timeout: 10000,
+      timeout: 5000,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -60,11 +65,11 @@ except Exception as e:
         }
       }
     }
-
-    envLoaded = true;
   } catch {
     // Silently fail
   }
+
+  envLoaded = true;
 }
 
 function getSupabaseCredentials(): SupabaseCredentials {
