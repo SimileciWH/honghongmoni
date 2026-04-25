@@ -38,6 +38,9 @@ const BOY_NAMES = ["小宇", "阿明", "小杰", "阿超", "阿伟"];
 const GIRL_NAMES = ["小雨", "小芳", "小丽", "小美", "阿玲"];
 
 export async function POST(request: NextRequest) {
+  const initStartedAt = Date.now();
+  const initRequestId = `game-init-${initStartedAt}-${Math.random().toString(36).substring(7)}`;
+
   try {
     const llmProvider = createAIProvider('qiniuyun');
     const ttsProvider = createTTSProvider('siliconflow');
@@ -126,7 +129,12 @@ ${playerName}（玩家）的伴侣名字：${partnerName}
       { role: "user" as const, content: topicTitle ? `生成一个关于"${topicTitle}"的吵架场景` : "生成一个随机的情侣吵架场景" }
     ];
 
+    const scenarioStartedAt = Date.now();
     const response = await llmProvider.chat(messages, { temperature: 0.9 });
+    console.log(`[${initRequestId}] Game init scenario generated`, {
+      duration: Date.now() - scenarioStartedAt,
+      hasTopic: Boolean(topicTitle),
+    });
 
     // 解析 JSON 响应
     let gameData;
@@ -223,22 +231,31 @@ ${partnerName}性格：${gameData.partnerPersonality}
 4. 只返回JSON，不要有其他解释`;
 
     // 并行生成 TTS 和选项
+    const parallelStartedAt = Date.now();
     const [ttsResult, optionsResult] = await Promise.all([
       // 生成 TTS
       (async () => {
+        const ttsStartedAt = Date.now();
         try {
           const ttsResponse = await ttsProvider.synthesize({
             text: gameData.scenario,
             voice: speaker,
           });
+          console.log(`[${initRequestId}] Game init TTS generated`, {
+            duration: Date.now() - ttsStartedAt,
+          });
           return { success: true, audioData: ttsResponse.audioData.toString('base64') };
         } catch (ttsError) {
           console.error("Init TTS error:", ttsError);
+          console.log(`[${initRequestId}] Game init TTS failed`, {
+            duration: Date.now() - ttsStartedAt,
+          });
           return { success: false, audioData: null };
         }
       })(),
       // 生成选项
       (async () => {
+        const optionsStartedAt = Date.now();
         try {
           const optionsResponse = await llmProvider.chat([
             { role: "system" as const, content: optionsPrompt },
@@ -248,11 +265,17 @@ ${partnerName}性格：${gameData.partnerPersonality}
           const jsonMatch = optionsResponse.content.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const optionsData = JSON.parse(jsonMatch[0]);
+            console.log(`[${initRequestId}] Game init options generated`, {
+              duration: Date.now() - optionsStartedAt,
+            });
             return { success: true, options: optionsData.options.sort(() => Math.random() - 0.5) };
           }
           throw new Error("No JSON in options response");
         } catch (optionsError) {
           console.error("Options generation error:", optionsError);
+          console.log(`[${initRequestId}] Game init options failed`, {
+            duration: Date.now() - optionsStartedAt,
+          });
           // 返回默认选项
           return {
             success: false,
@@ -270,6 +293,15 @@ ${partnerName}性格：${gameData.partnerPersonality}
       })(),
     ]);
 
+    console.log(`[${initRequestId}] Game init parallel tasks completed`, {
+      duration: Date.now() - parallelStartedAt,
+      ttsSuccess: ttsResult.success,
+      optionsSuccess: optionsResult.success,
+    });
+    console.log(`[${initRequestId}] Game init completed`, {
+      duration: Date.now() - initStartedAt,
+    });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -281,6 +313,9 @@ ${partnerName}性格：${gameData.partnerPersonality}
     });
   } catch (error) {
     console.error("Game init error:", error);
+    console.log(`[${initRequestId}] Game init failed`, {
+      duration: Date.now() - initStartedAt,
+    });
     return NextResponse.json(
       { success: false, error: "Failed to initialize game" },
       { status: 500 }
