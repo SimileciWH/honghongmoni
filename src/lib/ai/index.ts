@@ -10,9 +10,9 @@ export function createAIProvider(type: ProviderType = 'qiniuyun'): AIProvider {
   switch (type) {
     case 'qiniuyun':
       return new QiniuyunProvider({
-        apiKey: process.env.QINIUYUN_API_KEY || '',
-        baseUrl: process.env.QINIUYUN_BASE_URL || 'https://api.qnaigc.com/v1',
-        model: process.env.QINIUYUN_MODEL || 'deepseek/deepseek-v3.2-251201',
+        apiKey: process.env.SILICONFLOW_API_KEY || process.env.QINIUYUN_API_KEY || '',
+        baseUrl: process.env.SILICONFLOW_LLM_BASE_URL || process.env.QINIUYUN_BASE_URL || 'https://api.siliconflow.cn/v1',
+        model: process.env.SILICONFLOW_LLM_MODEL || process.env.QINIUYUN_MODEL || 'deepseek-ai/DeepSeek-V3.2',
       });
     default:
       throw new Error(`Unknown AI provider type: ${type}`);

@@ -24,12 +24,22 @@ export class QiniuyunProvider implements AIProvider {
     this.timeout = config.timeout || 60000;
   }
 
+  private getProviderName(): string {
+    if (this.config.baseUrl.includes('siliconflow.cn')) {
+      return 'siliconflow';
+    }
+    if (this.config.baseUrl.includes('openrouter.ai')) {
+      return 'openrouter';
+    }
+    return 'qiniuyun';
+  }
+
   async chat(messages: AIMessage[], options?: ChatOptions): Promise<AIResponse> {
     const startTime = Date.now();
     const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
     console.log(`[${requestId}] 🚀 AI Request started`, {
-      provider: 'qiniuyun',
+      provider: this.getProviderName(),
       model: this.config.model,
       messageCount: messages.length,
       timestamp: new Date().toISOString(),
@@ -89,7 +99,7 @@ export class QiniuyunProvider implements AIProvider {
         const errorMessage = getErrorMessage(response.status);
         
         console.error(`[${requestId}] ❌ AI Request failed`, {
-          provider: 'qiniuyun',
+          provider: this.getProviderName(),
           status: response.status,
           duration,
           error: errorMessage,
@@ -115,7 +125,7 @@ export class QiniuyunProvider implements AIProvider {
       };
 
       console.log(`[${requestId}] ✅ AI Request completed`, {
-        provider: 'qiniuyun',
+        provider: this.getProviderName(),
         model: this.config.model,
         duration,
         tokens: result.usage,
@@ -129,7 +139,7 @@ export class QiniuyunProvider implements AIProvider {
       const isAbort = errorMessage.includes('aborted');
 
       console.error(`[${requestId}] ❌ AI Request error`, {
-        provider: 'qiniuyun',
+        provider: this.getProviderName(),
         duration,
         error: isAbort ? 'TIMEOUT' : errorMessage,
         timestamp: new Date().toISOString(),
