@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createTTSProvider } from '@/lib/ai';
+import { uploadAudioToR2 } from '@/lib/storage/r2';
+
+export const runtime = "nodejs";
 
 // 音色映射 (SiliconFlow MOSS-TTS)
 // 女声：alex, anna, bella, claire, diana
@@ -23,7 +26,7 @@ export async function POST(request: NextRequest) {
   try {
     const ttsProvider = createTTSProvider('siliconflow');
 
-    const { text, voiceRoleId, playerRole } = await request.json();
+    const { text, voiceRoleId } = await request.json();
 
     const voice = VOICE_ROLE_MAP[voiceRoleId] || "fnlp/MOSS-TTSD-v0.5:alex";
 
@@ -32,12 +35,15 @@ export async function POST(request: NextRequest) {
       voice: voice,
     });
 
-    // 将音频数据转换为 base64
-    const audioBase64 = response.audioData.toString('base64');
+    const uploadedAudio = await uploadAudioToR2(response.audioData, {
+      source: "tts",
+      voiceRoleId,
+    });
 
     return NextResponse.json({
       success: true,
-      audioData: audioBase64,
+      audioUrl: uploadedAudio.url,
+      audioKey: uploadedAudio.key,
       audioSize: response.audioSize
     });
   } catch (error) {

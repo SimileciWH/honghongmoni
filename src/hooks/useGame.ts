@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 
-// 将 base64 音频数据转换为 audio URL
 function createAudioUrlFromBase64(base64Data: string): string {
   const byteCharacters = atob(base64Data);
   const byteNumbers = new Array(byteCharacters.length);
@@ -10,8 +9,20 @@ function createAudioUrlFromBase64(base64Data: string): string {
     byteNumbers[i] = byteCharacters.charCodeAt(i);
   }
   const byteArray = new Uint8Array(byteNumbers);
-  const blob = new Blob([byteArray], { type: "audio/mp3" });
+  const blob = new Blob([byteArray], { type: "audio/mpeg" });
   return URL.createObjectURL(blob);
+}
+
+function resolveAudioUrl(audioUrl?: string | null, audioData?: string | null): string | undefined {
+  if (audioUrl) {
+    return audioUrl;
+  }
+
+  if (audioData) {
+    return createAudioUrlFromBase64(audioData);
+  }
+
+  return undefined;
 }
 
 // 预设吵架话题列表
@@ -224,16 +235,14 @@ export function useGame(onGameEnd?: (result: { success: boolean; score: number; 
 
       if (result.success) {
         const { data } = result;
-        const playerRole = data.playerRole || "boyfriend";
-        const partnerName = data.partnerName || (playerRole === "boyfriend" ? "小雨" : "小宇");
-        const partnerPersonality = data.partnerPersonality || "有点小脾气，但很在乎你";
-        
+        const initialAudioUrl = resolveAudioUrl(data.initialAudioUrl, data.initialAudioData);
+
         // 创建第一条场景消息（带语音）
         const initialMessage = {
           speaker: "girl" as const,
           text: data.scenario,
           emotion: data.initialEmotion,
-          audioUrl: data.initialAudioData ? createAudioUrlFromBase64(data.initialAudioData) : undefined,
+          audioUrl: initialAudioUrl,
         };
         
         // 直接使用 init API 返回的选项，不需要单独请求
@@ -266,8 +275,8 @@ export function useGame(onGameEnd?: (result: { success: boolean; score: number; 
         }));
         
         // 设置初始语音并播放
-        if (data.initialAudioData) {
-          setAudioUrl(createAudioUrlFromBase64(data.initialAudioData));
+        if (initialAudioUrl) {
+          setAudioUrl(initialAudioUrl);
         }
       }
     } catch (error) {
@@ -342,8 +351,8 @@ export function useGame(onGameEnd?: (result: { success: boolean; score: number; 
             }),
           });
           const ttsResult = await ttsResponse.json();
-          if (ttsResult.success && ttsResult.audioData) {
-            newAudioUrl = createAudioUrlFromBase64(ttsResult.audioData);
+          if (ttsResult.success) {
+            newAudioUrl = resolveAudioUrl(ttsResult.audioUrl, ttsResult.audioData) || null;
           }
         } catch (ttsError) {
           console.error("TTS error:", ttsError);
@@ -426,16 +435,19 @@ export function useGame(onGameEnd?: (result: { success: boolean; score: number; 
           status: isFail ? "ended" : isSuccess ? "ended" : "playing",
           result: isSuccess ? "success" : isFail ? "fail" : null,
         }));
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorName = error instanceof Error ? error.name : undefined;
+        const errorMessage = error instanceof Error ? error.message : undefined;
+
         // 判断是否是中止错误
-        const isAbortError = error?.name === 'AbortError' || 
-                             error?.message?.includes('abort') ||
-                             error?.message?.includes('cancelled');
-        
+        const isAbortError = errorName === 'AbortError' ||
+                             errorMessage?.includes('abort') ||
+                             errorMessage?.includes('cancelled');
+
         // 判断是否是网络错误（网络断开、CORS等）
-        const isNetworkError = error?.message?.includes('Failed to fetch') ||
-                              error?.message?.includes('NetworkError') ||
-                              error?.message?.includes('Network request failed');
+        const isNetworkError = errorMessage?.includes('Failed to fetch') ||
+                              errorMessage?.includes('NetworkError') ||
+                              errorMessage?.includes('Network request failed');
         
         if (isAbortError) {
           console.log("Request cancelled, ignoring...");

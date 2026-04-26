@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAIProvider, createTTSProvider } from '@/lib/ai';
+import { uploadAudioToR2 } from '@/lib/storage/r2';
+
+export const runtime = "nodejs";
 
 // 音色映射 (SiliconFlow MOSS-TTS)
 // 女声：alex, anna, bella, claire, diana
@@ -165,7 +168,6 @@ ${playerName}（玩家）的伴侣名字：${partnerName}
     const speaker = VOICE_ROLE_MAP[voiceRoleId] || VOICE_ROLE_MAP[1];
     
     const playerLabel = isPlayerBoy ? "男朋友" : "女朋友";
-    const partnerLabel = isPlayerBoy ? "女朋友" : "男朋友";
 
     // 生成选项的提示词
     const optionsPrompt = `你是"哄哄模拟器"的游戏主持人。你的任务是为${playerLabel}生成7个可能的回复选项。
@@ -241,16 +243,27 @@ ${partnerName}性格：${gameData.partnerPersonality}
             text: gameData.scenario,
             voice: speaker,
           });
-          console.log(`[${initRequestId}] Game init TTS generated`, {
-            duration: Date.now() - ttsStartedAt,
+          const uploadedAudio = await uploadAudioToR2(ttsResponse.audioData, {
+            source: "game-init",
+            voiceRoleId,
           });
-          return { success: true, audioData: ttsResponse.audioData.toString('base64') };
+          console.log(`[${initRequestId}] Game init TTS uploaded`, {
+            duration: Date.now() - ttsStartedAt,
+            audioKey: uploadedAudio.key,
+            audioSize: ttsResponse.audioSize,
+          });
+          return {
+            success: true,
+            audioUrl: uploadedAudio.url,
+            audioKey: uploadedAudio.key,
+            audioSize: ttsResponse.audioSize,
+          };
         } catch (ttsError) {
           console.error("Init TTS error:", ttsError);
           console.log(`[${initRequestId}] Game init TTS failed`, {
             duration: Date.now() - ttsStartedAt,
           });
-          return { success: false, audioData: null };
+          return { success: false, audioUrl: null, audioKey: null, audioSize: 0 };
         }
       })(),
       // 生成选项
@@ -307,7 +320,8 @@ ${partnerName}性格：${gameData.partnerPersonality}
       data: {
         ...gameData,
         voiceRoleId: voiceRoleId || 1,
-        initialAudioData: ttsResult.success ? ttsResult.audioData : null,
+        initialAudioUrl: ttsResult.success ? ttsResult.audioUrl : null,
+        initialAudioKey: ttsResult.success ? ttsResult.audioKey : null,
         initialOptions: optionsResult.options
       }
     });
