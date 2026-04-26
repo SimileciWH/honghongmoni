@@ -1,9 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
-import { hash, compare } from "bcryptjs";
+import { hash } from "bcryptjs";
 
 export async function POST(request: NextRequest) {
-  const { username, password } = await request.json();
+  const { username, password, turnstileToken } = await request.json();
+
+  if (!turnstileToken) {
+    return NextResponse.json(
+      { success: false, error: "请先完成人机验证" },
+      { status: 400 }
+    );
+  }
+
+  const verifyResponse = await fetch(
+    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams({
+        secret: process.env.TURNSTILE_SECRET_KEY || "",
+        response: turnstileToken,
+        remoteip: request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for") || ""
+      })
+    }
+  );
+
+  const verifyData = await verifyResponse.json();
+
+  if (!verifyData.success) {
+    return NextResponse.json(
+      { success: false, error: "人机验证失败，请重试" },
+      { status: 400 }
+    );
+  }
 
   // 验证输入
   if (!username || !password) {

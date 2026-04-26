@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Loader2, UserPlus, Heart } from "lucide-react";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const turnstileRef = useRef<TurnstileInstance>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,6 +28,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!turnstileToken) {
+      setError("请先完成人机验证");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -33,21 +41,25 @@ export default function RegisterPage() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password, turnstileToken })
       });
 
       const data = await response.json();
 
       if (!data.success) {
         setError(data.error || "注册失败");
+        setTurnstileToken("");
+        turnstileRef.current?.reset();
         return;
       }
 
       // 注册成功后保存登录状态并跳转
       localStorage.setItem("user", JSON.stringify(data.data));
       router.push("/");
-    } catch (err) {
+    } catch {
       setError("网络错误，请稍后重试");
+      setTurnstileToken("");
+      turnstileRef.current?.reset();
     } finally {
       setIsLoading(false);
     }
@@ -115,9 +127,17 @@ export default function RegisterPage() {
               </div>
             )}
 
+            <Turnstile
+              ref={turnstileRef}
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+              onSuccess={setTurnstileToken}
+              onError={() => setTurnstileToken("")}
+              onExpire={() => setTurnstileToken("")}
+            />
+
             <Button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !turnstileToken}
               className="w-full bg-pink-500 hover:bg-pink-600"
             >
               {isLoading ? (
