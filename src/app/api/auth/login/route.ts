@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseClient } from "@/storage/database/supabase-client";
+import { db } from "@/storage/database/db";
+import { users } from "@/storage/database/shared/schema";
 import { compare } from "bcryptjs";
+import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
   const { username, password } = await request.json();
@@ -13,45 +15,46 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const client = getSupabaseClient();
+  try {
+    const [data] = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        password: users.password,
+      })
+      .from(users)
+      .where(eq(users.username, username))
+      .limit(1);
 
-  // 查找用户
-  const { data, error } = await client
-    .from("users")
-    .select("id, username, password")
-    .eq("username", username)
-    .maybeSingle();
+    if (!data) {
+      return NextResponse.json(
+        { success: false, error: "用户名或密码错误" },
+        { status: 401 }
+      );
+    }
 
-  if (error) {
+    // 验证密码
+    const isValidPassword = await compare(password, data.password);
+
+    if (!isValidPassword) {
+      return NextResponse.json(
+        { success: false, error: "用户名或密码错误" },
+        { status: 401 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        id: data.id,
+        username: data.username
+      }
+    });
+  } catch (error) {
     console.error("查询用户失败:", error);
     return NextResponse.json(
       { success: false, error: "登录失败，请稍后重试" },
       { status: 500 }
     );
   }
-
-  if (!data) {
-    return NextResponse.json(
-      { success: false, error: "用户名或密码错误" },
-      { status: 401 }
-    );
-  }
-
-  // 验证密码
-  const isValidPassword = await compare(password, data.password);
-
-  if (!isValidPassword) {
-    return NextResponse.json(
-      { success: false, error: "用户名或密码错误" },
-      { status: 401 }
-    );
-  }
-
-  return NextResponse.json({
-    success: true,
-    data: {
-      id: data.id,
-      username: data.username
-    }
-  });
 }

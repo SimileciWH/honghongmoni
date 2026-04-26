@@ -3,7 +3,7 @@ import { createAIProvider } from '@/lib/ai';
 
 export async function POST(request: NextRequest) {
   try {
-    const provider = createAIProvider('qiniuyun');
+    const provider = createAIProvider('siliconflow');
 
     const { scenario, partnerName, partnerPersonality, currentRound, playerRole } = await request.json();
 

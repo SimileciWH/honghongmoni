@@ -1,44 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseClient } from "@/storage/database/supabase-client";
-import { LLMClient, Config } from "coze-coding-dev-sdk";
+import { createAIProvider } from "@/lib/ai";
+import { db } from "@/storage/database/db";
+import { blogPosts } from "@/storage/database/shared/schema";
+import { desc, eq } from "drizzle-orm";
 
 // GET: 获取文章列表
 export async function GET() {
-  const client = getSupabaseClient();
-  
-  const { data, error } = await client
-    .from("blog_posts")
-    .select("id, title, summary, created_at")
-    .order("created_at", { ascending: false });
-  
-  if (error) {
+  try {
+    const data = await db
+      .select({
+        id: blogPosts.id,
+        title: blogPosts.title,
+        summary: blogPosts.summary,
+      })
+      .from(blogPosts)
+      .orderBy(desc(blogPosts.createdAt));
+
+    return NextResponse.json({
+      success: true,
+      data: data.map((article) => ({
+        slug: article.id.toString(),
+        title: article.title,
+        summary: article.summary
+      }))
+    });
+  } catch (error) {
     console.error("获取文章列表失败:", error);
     return NextResponse.json(
       { success: false, error: "获取文章列表失败" },
       { status: 500 }
     );
   }
-  
-  return NextResponse.json({
-    success: true,
-    data: data.map((article: { id: number; title: string; summary: string; created_at: string }) => ({
-      slug: article.id.toString(),
-      title: article.title,
-      summary: article.summary
-    }))
-  });
 }
 
 // POST: 获取文章详情或生成新文章
 export async function POST(request: NextRequest) {
   const { slug, action } = await request.json();
-  const client = getSupabaseClient();
-  
+
   // 生成新文章
   if (action === "generate") {
-    return generateNewArticle(client);
+    return generateNewArticle();
   }
-  
+
   // 获取文章详情
   if (!slug) {
     return NextResponse.json(
@@ -46,7 +49,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  
+
   const articleId = parseInt(slug, 10);
   if (isNaN(articleId)) {
     return NextResponse.json(
@@ -54,41 +57,46 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  
-  const { data, error } = await client
-    .from("blog_posts")
-    .select("id, title, content, created_at")
-    .eq("id", articleId)
-    .maybeSingle();
-  
-  if (error) {
+
+  try {
+    const [data] = await db
+      .select({
+        id: blogPosts.id,
+        title: blogPosts.title,
+        content: blogPosts.content,
+        createdAt: blogPosts.createdAt,
+      })
+      .from(blogPosts)
+      .where(eq(blogPosts.id, articleId))
+      .limit(1);
+
+    if (!data) {
+      return NextResponse.json(
+        { success: false, error: "文章不存在" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        slug: data.id.toString(),
+        title: data.title,
+        content: data.content,
+        publishedAt: data.createdAt
+      }
+    });
+  } catch (error) {
     console.error("获取文章详情失败:", error);
     return NextResponse.json(
       { success: false, error: "获取文章详情失败" },
       { status: 500 }
     );
   }
-  
-  if (!data) {
-    return NextResponse.json(
-      { success: false, error: "文章不存在" },
-      { status: 404 }
-    );
-  }
-  
-  return NextResponse.json({
-    success: true,
-    data: {
-      slug: data.id.toString(),
-      title: data.title,
-      content: data.content,
-      publishedAt: data.created_at
-    }
-  });
 }
 
 // 生成新文章
-async function generateNewArticle(client: ReturnType<typeof getSupabaseClient>) {
+async function generateNewArticle() {
   // 随机选择一个主题
   const topics = [
     {
@@ -152,50 +160,41 @@ async function generateNewArticle(client: ReturnType<typeof getSupabaseClient>) 
 请直接输出文章内容，不要加标题符号和多余的格式。`
     }
   ];
-  
+
   const randomTopic = topics[Math.floor(Math.random() * topics.length)];
-  
+
   try {
-    const config = new Config();
-    const llmClient = new LLMClient(config);
-    
-    const messages = [
-      { role: "user" as const, content: randomTopic.prompt }
-    ];
-    
-    const response = await llmClient.invoke(messages, {
-      temperature: 0.8
-    });
-    
+    const aiProvider = createAIProvider("siliconflow");
+    const response = await aiProvider.chat(
+      [{ role: "user", content: randomTopic.prompt }],
+      { temperature: 0.8 }
+    );
+
     // 生成摘要（取前100字）
     const summary = response.content.split("\n")[0].slice(0, 100) + "...";
-    
+
     // 保存到数据库
-    const { data, error } = await client
-      .from("blog_posts")
-      .insert({
+    const [data] = await db
+      .insert(blogPosts)
+      .values({
         title: randomTopic.title,
-        summary: summary,
+        summary,
         content: response.content
       })
-      .select("id, title, content, created_at")
-      .single();
-    
-    if (error) {
-      console.error("保存文章失败:", error);
-      return NextResponse.json(
-        { success: false, error: "保存文章失败" },
-        { status: 500 }
-      );
-    }
-    
+      .returning({
+        id: blogPosts.id,
+        title: blogPosts.title,
+        content: blogPosts.content,
+        createdAt: blogPosts.createdAt,
+      });
+
     return NextResponse.json({
       success: true,
       data: {
         slug: data.id.toString(),
         title: data.title,
         content: data.content,
-        publishedAt: data.created_at
+        publishedAt: data.createdAt
       }
     });
   } catch (error) {

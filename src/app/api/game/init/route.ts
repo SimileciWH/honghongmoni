@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   const initRequestId = `game-init-${initStartedAt}-${Math.random().toString(36).substring(7)}`;
 
   try {
-    const llmProvider = createAIProvider('qiniuyun');
+    const llmProvider = createAIProvider('siliconflow');
     const ttsProvider = createTTSProvider('siliconflow');
 
     const { role, topicId, voiceRoleId } = await request.json();

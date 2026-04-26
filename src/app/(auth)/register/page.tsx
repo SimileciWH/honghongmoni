@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const turnstileRef = useRef<TurnstileInstance>(null);
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -41,7 +42,7 @@ export default function RegisterPage() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ username, password, turnstileToken })
+        body: JSON.stringify({ username, email, password, turnstileToken })
       });
 
       const data = await response.json();
@@ -88,6 +89,20 @@ export default function RegisterPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="3-20个字符，支持字母、数字、下划线"
+                disabled={isLoading}
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                邮箱
+              </label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="用于接收欢迎邮件"
                 disabled={isLoading}
                 className="w-full"
               />

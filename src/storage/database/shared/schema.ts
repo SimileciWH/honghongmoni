@@ -6,11 +6,13 @@ export const users = pgTable(
   {
     id: serial().primaryKey(),
     username: varchar({ length: 50 }).notNull().unique(),
+    email: varchar({ length: 255 }).unique(),
     password: varchar({ length: 255 }).notNull(),
     created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("users_username_idx").on(table.username),
+    index("users_email_idx").on(table.email),
   ]
 );
 

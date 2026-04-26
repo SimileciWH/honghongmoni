@@ -37,4 +37,4 @@ export interface ProviderConfig {
   timeout?: number;
 }
 
-export type ProviderType = 'qiniuyun' | 'openai' | 'coze';
+export type ProviderType = 'siliconflow' | 'qiniuyun' | 'openai';

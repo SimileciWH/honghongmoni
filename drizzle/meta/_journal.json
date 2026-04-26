@@ -8,6 +8,13 @@
       "when": 1777107856632,
       "tag": "0000_windy_tempest",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777183140000,
+      "tag": "0001_add_users_email",
+      "breakpoints": true
     }
   ]
 }

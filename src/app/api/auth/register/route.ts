@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseClient } from "@/storage/database/supabase-client";
+import { sendWelcomeEmail } from "@/lib/email";
+import { db } from "@/storage/database/db";
+import { users } from "@/storage/database/shared/schema";
 import { hash } from "bcryptjs";
+import { eq, or } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
-  const { username, password, turnstileToken } = await request.json();
+  const { username, email, password, turnstileToken } = await request.json();
 
   if (!turnstileToken) {
     return NextResponse.json(
@@ -37,9 +40,9 @@ export async function POST(request: NextRequest) {
   }
 
   // 验证输入
-  if (!username || !password) {
+  if (!username || !email || !password) {
     return NextResponse.json(
-      { success: false, error: "用户名和密码不能为空" },
+      { success: false, error: "用户名、邮箱和密码不能为空" },
       { status: 400 }
     );
   }
@@ -58,6 +61,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return NextResponse.json(
+      { success: false, error: "邮箱格式不正确" },
+      { status: 400 }
+    );
+  }
+
   // 只允许字母、数字、下划线
   const usernameRegex = /^[a-zA-Z0-9_]+$/;
   if (!usernameRegex.test(username)) {
@@ -67,56 +78,63 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const client = getSupabaseClient();
+  try {
+    const [existingUser] = await db
+      .select({ username: users.username, email: users.email })
+      .from(users)
+      .where(or(eq(users.username, username), eq(users.email, email)))
+      .limit(1);
 
-  // 检查用户名是否已存在
-  const { data: existingUser, error: checkError } = await client
-    .from("users")
-    .select("id")
-    .eq("username", username)
-    .maybeSingle();
+    if (existingUser?.username === username) {
+      return NextResponse.json(
+        { success: false, error: "用户名已存在" },
+        { status: 409 }
+      );
+    }
 
-  if (checkError) {
-    console.error("检查用户名失败:", checkError);
-    return NextResponse.json(
-      { success: false, error: "注册失败，请稍后重试" },
-      { status: 500 }
-    );
-  }
+    if (existingUser?.email === email) {
+      return NextResponse.json(
+        { success: false, error: "邮箱已被注册" },
+        { status: 409 }
+      );
+    }
 
-  if (existingUser) {
-    return NextResponse.json(
-      { success: false, error: "用户名已存在" },
-      { status: 409 }
-    );
-  }
+    // 哈希密码
+    const hashedPassword = await hash(password, 10);
 
-  // 哈希密码
-  const hashedPassword = await hash(password, 10);
+    // 创建用户
+    const [data] = await db
+      .insert(users)
+      .values({
+        username,
+        email,
+        password: hashedPassword
+      })
+      .returning({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+      });
 
-  // 创建用户
-  const { data, error } = await client
-    .from("users")
-    .insert({
-      username,
-      password: hashedPassword
-    })
-    .select("id, username")
-    .single();
+    try {
+      await sendWelcomeEmail(data.email ?? email, data.username);
+    } catch (emailError) {
+      console.error("欢迎邮件发送失败:", emailError);
+    }
 
-  if (error) {
+    return NextResponse.json({
+      success: true,
+      data: {
+        id: data.id,
+        username: data.username,
+        email: data.email
+      }
+    });
+  } catch (error) {
     console.error("创建用户失败:", error);
     return NextResponse.json(
       { success: false, error: "注册失败，请稍后重试" },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    success: true,
-    data: {
-      id: data.id,
-      username: data.username
-    }
-  });
 }

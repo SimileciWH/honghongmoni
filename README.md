@@ -38,10 +38,7 @@ pnpm install
 本地使用 `.env.local`。至少需要根据实际功能配置以下变量：
 
 ```bash
-# 数据库 / Supabase
-COZE_SUPABASE_URL=
-COZE_SUPABASE_ANON_KEY=
-COZE_SUPABASE_SERVICE_ROLE_KEY=
+# 数据库 / Neon
 NEON_DATABASE_URL=
 
 # AI / TTS

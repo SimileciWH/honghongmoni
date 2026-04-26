@@ -7,8 +7,8 @@
 - **Language**: TypeScript 5
 - **UI 组件**: shadcn/ui (基于 Radix UI)
 - **Styling**: Tailwind CSS 4
-- **LLM**: coze-coding-dev-sdk (豆包/DeepSeek/Kimi)
-- **TTS**: 语音合成服务
+- **LLM**: SiliconFlow LLM API
+- **TTS**: SiliconFlow TTS API
 
 ## 项目概述
 

@@ -6,8 +6,9 @@ import { SiliconFlowTTSProvider } from './siliconflow-tts-provider';
 export type { AIProvider, AIMessage, AIResponse, ChatOptions } from './provider';
 export type { TTSProvider, TTSResponse, TTSOptions } from './tts-provider';
 
-export function createAIProvider(type: ProviderType = 'qiniuyun'): AIProvider {
+export function createAIProvider(type: ProviderType = 'siliconflow'): AIProvider {
   switch (type) {
+    case 'siliconflow':
     case 'qiniuyun':
       return new QiniuyunProvider({
         apiKey: process.env.SILICONFLOW_API_KEY || process.env.QINIUYUN_API_KEY || '',
