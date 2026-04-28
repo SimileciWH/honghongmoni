@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Heart, Angry, AlertTriangle, Thermometer, Smile, Frown, Music, RotateCcw, Users, MessageSquare, Mic, Loader2, BookOpen, User, LogOut, CheckCircle, Trophy } from "lucide-react";
+import { Heart, Angry, AlertTriangle, Thermometer, Smile, Frown, Music, RotateCcw, Users, MessageSquare, Mic, Loader2, BookOpen, User, LogOut, CheckCircle, Trophy, Mail } from "lucide-react";
 
 interface UserInfo {
   id: number;
@@ -363,15 +363,30 @@ export default function GamePage() {
 
               {/* 排行榜入口 */}
               <Link href="/leaderboard" className="w-full mt-2">
-                <Button 
+                <Button
                   variant="outline"
-                  size="lg" 
+                  size="lg"
                   className="w-full border-amber-300 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
                 >
                   <Trophy className="w-4 h-4 mr-2" />
                   排行榜
                 </Button>
               </Link>
+
+              <Link href="/contact" className="w-full mt-2">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-gray-700"
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  联系我们
+                </Button>
+              </Link>
+
+              <p className="text-xs text-gray-400 text-center leading-relaxed pt-1">
+                有问题或建议？请通过“联系我们”页面复制邮箱地址。
+              </p>
             </div>
           </div>
         )}
